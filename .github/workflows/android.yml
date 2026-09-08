@@ -1,0 +1,47 @@
+name: Android Build
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Build with Gradle
+      run: ./gradlew build
+
+    - name: Run lint
+      run: ./gradlew lint
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: app-release
+        path: app/build/outputs/apk/release/*.apk
+
+    - name: Check APK size
+      run: |
+        APK_SIZE=$(stat -f%z app/build/outputs/apk/release/*.apk 2>/dev/null || stat -c%s app/build/outputs/apk/release/*.apk 2>/dev/null)
+        APK_SIZE_MB=$((APK_SIZE / 1048576))
+        echo "APK Size: ${APK_SIZE_MB}MB"
+        if [ $APK_SIZE_MB -gt 5 ]; then
+          echo "ERROR: APK size exceeds 5MB limit"
+          exit 1
+        fi
